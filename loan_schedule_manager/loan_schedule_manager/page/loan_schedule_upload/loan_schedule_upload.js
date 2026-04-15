@@ -85,8 +85,7 @@ class LoanScheduleUploadWizard {
         const fd = new FormData();
         fd.append("file", file, file.name);
         fd.append("is_private", "0");
-        fd.append("folder", "Home/Loan Schedules");
-
+        fd.append("folder", "Home/Attachments");
         fetch("/api/method/upload_file", {
             method: "POST",
             headers: { "X-Frappe-CSRF-Token": frappe.csrf_token },
