@@ -23,6 +23,7 @@
   "section_financial",
   "disbursement_date",
   "disbursement_amount",
+  "disbursement_je",
   "total_principal",
   "total_interest",
   "outstanding_amount",
@@ -133,6 +134,14 @@
    "label": "Disbursement Amount",
    "options": "currency",
    "read_only": 1
+  },
+  {
+   "fieldname": "disbursement_je",
+   "fieldtype": "Link",
+   "label": "Disbursement Journal Entry",
+   "options": "Journal Entry",
+   "read_only": 1,
+   "description": "Journal Entry recording the loan disbursement"
   },
   {
    "fieldname": "total_principal",

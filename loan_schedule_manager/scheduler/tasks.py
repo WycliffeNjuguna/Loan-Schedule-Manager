@@ -1,19 +1,21 @@
 """
 Scheduler tasks for Loan Schedule Manager.
 
-Runs daily to auto-create Journal Entries for repayment lines that are due.
+Runs daily to auto-create DRAFT Journal Entries for repayment lines that are due.
+The user reviews and submits each JE manually — submission triggers the
+on_submit hook in events/journal_entry.py which marks the line as Posted.
 """
 
 import frappe
 from frappe import _
-from frappe.utils import today, getdate, flt, now_datetime
+from frappe.utils import today, getdate, flt
 
 
 def create_due_loan_journal_entries():
     """
     Daily scheduler task.
-    Finds all active loan schedules and creates Journal Entries for lines
-    whose due_date <= today and status == 'Pending'.
+    Creates draft Bank Entry JEs for all Active schedule lines whose
+    due_date <= today and status == 'Pending'.
     """
     today_date = getdate(today())
 
@@ -35,7 +37,7 @@ def create_due_loan_journal_entries():
 
 
 def _process_schedule(doc, today_date):
-    """Process one schedule: create JEs for due pending lines."""
+    """Create draft JEs for all overdue pending lines in one schedule."""
     for line in doc.schedule_lines:
         if line.status != "Pending":
             continue
@@ -55,12 +57,15 @@ def _process_schedule(doc, today_date):
 
 def _create_je_for_line(doc, line) -> str:
     """
-    Create and submit a Journal Entry for a single schedule line.
+    Create a DRAFT Bank Entry for a single schedule line.
 
     Accounting entries:
-        DR  Loan Liability Account        principal_amount  (reduces the loan)
-        DR  Interest Expense Account      interest_amount
-        CR  Bank / Cash Account           total_payment     (cash out)
+        DR  Loan Liability Account     principal_amount
+        DR  Interest Expense Account   interest_amount
+        CR  Bank / Cash Account        total_payment
+
+    The JE is left as a draft (docstatus=0). When the user submits it,
+    the on_submit hook in events/journal_entry.py updates the schedule line.
 
     Returns: Journal Entry name
     """
@@ -108,62 +113,32 @@ def _create_je_for_line(doc, line) -> str:
     je = frappe.get_doc({
         "doctype": "Journal Entry",
         "title": je_title,
-        "voucher_type": "Journal Entry",
+        "voucher_type": "Bank Entry",
         "company": company,
         "posting_date": line.due_date,
         "multi_currency": 1 if is_multi_currency else 0,
         "accounts": accounts,
         "user_remark": je_title,
         "custom_loan_schedule": doc.name,
-        "custom_loan_schedule_line_date": line.due_date,
+        "custom_loan_schedule_line_date": str(line.due_date),
     })
 
-    je.flags.ignore_links = True
     je.insert(ignore_permissions=True)
+    # ── DRAFT only — do NOT call je.submit() ──────────────────────────────
+    # The user will review and submit. The on_submit hook handles the rest.
 
-    # Temporarily disable the on_submit hook to prevent it from saving the
-    # parent doc — we will update via direct DB writes below to avoid the
-    # TimestampMismatchError that occurs when two saves happen in rapid succession.
-    je.flags.from_scheduler = True
-    je.submit()
-
-    # ── Update the schedule line via direct DB (no doc.save()) ──────────────
+    # Mark the line as "Draft JE Created" so the scheduler doesn't re-create it
     frappe.db.set_value(
         "Bank Loan Schedule Line",
         line.name,
         {
-            "status":                "Posted",
-            "journal_entry":         je.name,
-            "journal_entry_date":    str(line.due_date),
-            "actual_principal_paid": flt(line.principal_amount),
-            "actual_interest_paid":  flt(line.interest_amount),
-            "actual_total_paid":     flt(line.total_payment),
-            "variance_principal":    0.0,
-            "variance_interest":     0.0,
+            "status":          "Pending",   # stays Pending until user submits
+            "journal_entry":   je.name,     # link so user can find it
         },
         update_modified=False,
     )
 
-    # ── Update parent schedule outstanding + status via direct DB ───────────
-    new_status = "Completed" if flt(line.outstanding_amount) == 0 else "Active"
-    frappe.db.set_value(
-        "Bank Loan Schedule",
-        doc.name,
-        {
-            "outstanding_amount": flt(line.outstanding_amount),
-            "status":             new_status,
-        },
-        update_modified=True,
+    frappe.logger().info(
+        f"Draft JE {je.name} created for {doc.name} / {line.due_date}"
     )
-
-    # Keep the in-memory object in sync so callers see current state
-    line.status               = "Posted"
-    line.journal_entry        = je.name
-    line.actual_principal_paid = flt(line.principal_amount)
-    line.actual_interest_paid  = flt(line.interest_amount)
-    line.actual_total_paid     = flt(line.total_payment)
-    doc.outstanding_amount     = flt(line.outstanding_amount)
-    doc.status                 = new_status
-
-    frappe.logger().info(f"Created JE {je.name} for {doc.name} / {line.due_date}")
     return je.name
