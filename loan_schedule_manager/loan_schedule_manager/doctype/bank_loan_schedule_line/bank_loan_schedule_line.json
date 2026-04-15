@@ -1,0 +1,137 @@
+{
+ "actions": [],
+ "creation": "2026-02-01 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "due_date",
+  "total_payment",
+  "principal_amount",
+  "interest_amount",
+  "outstanding_amount",
+  "column_break_1",
+  "status",
+  "journal_entry",
+  "journal_entry_date",
+  "actual_principal_paid",
+  "actual_interest_paid",
+  "actual_total_paid",
+  "variance_principal",
+  "variance_interest"
+ ],
+ "fields": [
+  {
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Due Date",
+   "reqd": 1,
+   "in_global_search": 1
+  },
+  {
+   "fieldname": "total_payment",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Scheduled Total",
+   "options": "currency"
+  },
+  {
+   "fieldname": "principal_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Scheduled Principal",
+   "options": "currency"
+  },
+  {
+   "fieldname": "interest_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Scheduled Interest",
+   "options": "currency"
+  },
+  {
+   "fieldname": "outstanding_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Outstanding After",
+   "options": "currency"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Pending\nPosted\nAdjusted\nCancelled",
+   "default": "Pending"
+  },
+  {
+   "fieldname": "journal_entry",
+   "fieldtype": "Link",
+   "label": "Journal Entry",
+   "options": "Journal Entry",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "journal_entry_date",
+   "fieldtype": "Date",
+   "label": "JE Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_principal_paid",
+   "fieldtype": "Currency",
+   "label": "Actual Principal Paid",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_interest_paid",
+   "fieldtype": "Currency",
+   "label": "Actual Interest Paid",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_total_paid",
+   "fieldtype": "Currency",
+   "label": "Actual Total Paid",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "variance_principal",
+   "fieldtype": "Currency",
+   "label": "Variance (Principal)",
+   "options": "currency",
+   "read_only": 1,
+   "description": "Actual minus Scheduled. Negative = underpaid."
+  },
+  {
+   "fieldname": "variance_interest",
+   "fieldtype": "Currency",
+   "label": "Variance (Interest)",
+   "options": "currency",
+   "read_only": 1,
+   "description": "Actual minus Scheduled. Negative = underpaid."
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-02-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Loan Schedule Manager",
+ "name": "Bank Loan Schedule Line",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "due_date",
+ "sort_order": "ASC",
+ "title_field": "due_date",
+ "track_changes": 1
+}

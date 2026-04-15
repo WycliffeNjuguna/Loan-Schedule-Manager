@@ -1,0 +1,255 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 0,
+ "autoname": "field:arrangement_id",
+ "creation": "2026-02-01 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "arrangement_id",
+  "product_name",
+  "customer_id",
+  "customer_name",
+  "currency",
+  "column_break_1",
+  "loan_account",
+  "interest_account",
+  "principal_account",
+  "bank_account",
+  "cost_center",
+  "section_financial",
+  "disbursement_date",
+  "disbursement_amount",
+  "total_principal",
+  "total_interest",
+  "outstanding_amount",
+  "column_break_2",
+  "first_repayment_date",
+  "last_repayment_date",
+  "monthly_installment",
+  "status",
+  "pdf_file",
+  "section_schedule",
+  "schedule_lines",
+  "section_adjustments",
+  "adjustment_log"
+ ],
+ "fields": [
+  {
+   "fieldname": "arrangement_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Arrangement ID",
+   "reqd": 1,
+   "unique": 1,
+   "bold": 1
+  },
+  {
+   "fieldname": "product_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Product Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Customer ID",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "loan_account",
+   "fieldtype": "Link",
+   "label": "Loan Liability Account",
+   "options": "Account",
+   "reqd": 1,
+   "description": "Account representing the loan payable (e.g. Loans Payable)"
+  },
+  {
+   "fieldname": "interest_account",
+   "fieldtype": "Link",
+   "label": "Interest Expense Account",
+   "options": "Account",
+   "reqd": 1,
+   "description": "Account for interest expense on this loan"
+  },
+  {
+   "fieldname": "principal_account",
+   "fieldtype": "Link",
+   "label": "Principal Repayment Account",
+   "options": "Account",
+   "reqd": 1,
+   "description": "Asset/bank account from which principal repayments are made"
+  },
+  {
+   "fieldname": "bank_account",
+   "fieldtype": "Link",
+   "label": "Bank / Cash Account",
+   "options": "Account",
+   "reqd": 1,
+   "description": "Bank account used for repayment payments"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "section_financial",
+   "fieldtype": "Section Break",
+   "label": "Financial Summary"
+  },
+  {
+   "fieldname": "disbursement_date",
+   "fieldtype": "Date",
+   "label": "Disbursement Date",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "disbursement_amount",
+   "fieldtype": "Currency",
+   "label": "Disbursement Amount",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_principal",
+   "fieldtype": "Currency",
+   "label": "Total Principal",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_interest",
+   "fieldtype": "Currency",
+   "label": "Total Interest",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "outstanding_amount",
+   "fieldtype": "Currency",
+   "label": "Current Outstanding",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "first_repayment_date",
+   "fieldtype": "Date",
+   "label": "First Repayment Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_repayment_date",
+   "fieldtype": "Date",
+   "label": "Last Repayment Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "monthly_installment",
+   "fieldtype": "Currency",
+   "label": "Monthly Installment",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Active\nCompleted\nCancelled",
+   "default": "Active",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "pdf_file",
+   "fieldtype": "Attach",
+   "label": "Source PDF"
+  },
+  {
+   "fieldname": "section_schedule",
+   "fieldtype": "Section Break",
+   "label": "Repayment Schedule"
+  },
+  {
+   "fieldname": "schedule_lines",
+   "fieldtype": "Table",
+   "label": "Schedule Lines",
+   "options": "Bank Loan Schedule Line",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_adjustments",
+   "fieldtype": "Section Break",
+   "label": "Adjustment History"
+  },
+  {
+   "fieldname": "adjustment_log",
+   "fieldtype": "Table",
+   "label": "Adjustment Log",
+   "options": "Bank Loan Schedule Adjustment",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-02-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Loan Schedule Manager",
+ "name": "Bank Loan Schedule",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "arrangement_id",
+ "track_changes": 1
+}

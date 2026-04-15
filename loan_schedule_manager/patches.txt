@@ -1,0 +1,1 @@
+loan_schedule_manager.patches.v1_0.add_custom_fields_to_journal_entry

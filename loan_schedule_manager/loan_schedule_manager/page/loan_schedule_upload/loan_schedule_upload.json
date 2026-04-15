@@ -1,0 +1,18 @@
+{
+ "creation": "2026-02-01 00:00:00.000000",
+ "doctype": "Page",
+ "module": "Loan Schedule Manager",
+ "name": "loan-schedule-upload",
+ "page_name": "loan-schedule-upload",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  }
+ ],
+ "script": "",
+ "standard": "Yes",
+ "title": "Loan Schedule Upload"
+}

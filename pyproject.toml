@@ -1,0 +1,20 @@
+[project]
+name = "loan_schedule_manager"
+version = "1.0.0"
+description = "Bank Loan Repayment Schedule Manager for Frappe/ERPNext"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "frappe",
+    "pdfplumber",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "coverage"]
+
+[build-system]
+requires = ["flit_core>=3.4.0,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.bench.frappe-dependencies]
+frappe = ">=15.0.0"

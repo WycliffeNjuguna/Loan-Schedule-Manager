@@ -1,0 +1,127 @@
+{
+ "actions": [],
+ "creation": "2026-02-01 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "adjustment_date",
+  "adjusted_by",
+  "due_date_affected",
+  "journal_entry",
+  "adjustment_type",
+  "column_break_1",
+  "scheduled_principal",
+  "actual_principal",
+  "principal_variance",
+  "scheduled_interest",
+  "actual_interest",
+  "interest_variance",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "adjustment_date",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Adjustment Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "adjusted_by",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Adjusted By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "due_date_affected",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Schedule Line Due Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "journal_entry",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Journal Entry",
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "adjustment_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Type",
+   "options": "Manual Adjustment\nJE Cancelled\nJE Amended\nPartial Payment\nOverpayment",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "scheduled_principal",
+   "fieldtype": "Currency",
+   "label": "Scheduled Principal",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_principal",
+   "fieldtype": "Currency",
+   "label": "Actual Principal",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "principal_variance",
+   "fieldtype": "Currency",
+   "label": "Principal Variance",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "scheduled_interest",
+   "fieldtype": "Currency",
+   "label": "Scheduled Interest",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_interest",
+   "fieldtype": "Currency",
+   "label": "Actual Interest",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "interest_variance",
+   "fieldtype": "Currency",
+   "label": "Interest Variance",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-02-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Loan Schedule Manager",
+ "name": "Bank Loan Schedule Adjustment",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "adjustment_date",
+ "sort_order": "DESC",
+ "title_field": "adjustment_date",
+ "track_changes": 1
+}
