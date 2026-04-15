@@ -27,7 +27,7 @@ def create_due_loan_journal_entries():
         try:
             doc = frappe.get_doc("Bank Loan Schedule", row.name)
             _process_schedule(doc, today_date)
-        except Exception as e:
+        except Exception:
             frappe.log_error(
                 title=f"Loan Schedule JE Error: {row.name}",
                 message=frappe.get_traceback(),
@@ -72,12 +72,10 @@ def _create_je_for_line(doc, line) -> str:
     if not company:
         frappe.throw(_("No company configured. Please set a default company."))
 
-    # Build JE title
     je_title = f"Loan Repayment – {doc.arrangement_id} – {line.due_date}"
 
     accounts = []
 
-    # DR Loan Liability (reduces liability → debit)
     if flt(line.principal_amount) > 0:
         accounts.append({
             "account": doc.loan_account,
@@ -87,7 +85,6 @@ def _create_je_for_line(doc, line) -> str:
             "user_remark": f"Principal repayment – {doc.arrangement_id}",
         })
 
-    # DR Interest Expense
     if flt(line.interest_amount) > 0:
         accounts.append({
             "account": doc.interest_account,
@@ -97,7 +94,6 @@ def _create_je_for_line(doc, line) -> str:
             "user_remark": f"Interest payment – {doc.arrangement_id}",
         })
 
-    # CR Bank Account
     accounts.append({
         "account": doc.bank_account,
         "debit_in_account_currency": 0,
@@ -106,7 +102,6 @@ def _create_je_for_line(doc, line) -> str:
         "user_remark": f"Loan repayment – {doc.arrangement_id}",
     })
 
-    # Determine if multi-currency JE is needed
     company_currency = frappe.db.get_value("Company", company, "default_currency") or "KES"
     is_multi_currency = doc.currency != company_currency
 
@@ -123,25 +118,52 @@ def _create_je_for_line(doc, line) -> str:
         "custom_loan_schedule_line_date": line.due_date,
     })
 
+    je.flags.ignore_links = True
     je.insert(ignore_permissions=True)
+
+    # Temporarily disable the on_submit hook to prevent it from saving the
+    # parent doc — we will update via direct DB writes below to avoid the
+    # TimestampMismatchError that occurs when two saves happen in rapid succession.
+    je.flags.from_scheduler = True
     je.submit()
 
-    # Update schedule line
-    line.status = "Posted"
-    line.journal_entry = je.name
-    line.journal_entry_date = line.due_date
+    # ── Update the schedule line via direct DB (no doc.save()) ──────────────
+    frappe.db.set_value(
+        "Bank Loan Schedule Line",
+        line.name,
+        {
+            "status":                "Posted",
+            "journal_entry":         je.name,
+            "journal_entry_date":    str(line.due_date),
+            "actual_principal_paid": flt(line.principal_amount),
+            "actual_interest_paid":  flt(line.interest_amount),
+            "actual_total_paid":     flt(line.total_payment),
+            "variance_principal":    0.0,
+            "variance_interest":     0.0,
+        },
+        update_modified=False,
+    )
+
+    # ── Update parent schedule outstanding + status via direct DB ───────────
+    new_status = "Completed" if flt(line.outstanding_amount) == 0 else "Active"
+    frappe.db.set_value(
+        "Bank Loan Schedule",
+        doc.name,
+        {
+            "outstanding_amount": flt(line.outstanding_amount),
+            "status":             new_status,
+        },
+        update_modified=True,
+    )
+
+    # Keep the in-memory object in sync so callers see current state
+    line.status               = "Posted"
+    line.journal_entry        = je.name
     line.actual_principal_paid = flt(line.principal_amount)
-    line.actual_interest_paid = flt(line.interest_amount)
-    line.actual_total_paid = flt(line.total_payment)
-    line.variance_principal = 0.0
-    line.variance_interest = 0.0
-
-    # Update outstanding on the parent doc
-    doc.outstanding_amount = flt(line.outstanding_amount)
-    if flt(line.outstanding_amount) == 0:
-        doc.status = "Completed"
-
-    doc.save(ignore_permissions=True)
+    line.actual_interest_paid  = flt(line.interest_amount)
+    line.actual_total_paid     = flt(line.total_payment)
+    doc.outstanding_amount     = flt(line.outstanding_amount)
+    doc.status                 = new_status
 
     frappe.logger().info(f"Created JE {je.name} for {doc.name} / {line.due_date}")
     return je.name

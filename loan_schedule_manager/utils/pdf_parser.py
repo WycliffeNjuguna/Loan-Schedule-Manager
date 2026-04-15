@@ -1,13 +1,22 @@
 """
 PDF Parser for Bank Loan Repayment Schedules.
 
-Handles the schedule format produced by core banking systems, as seen in
-Arrangement Schedule Projection documents. PDF structure:
-  - Header: Arrangement Id, Product Name, Customer Id, Customer Name, Currency
-  - Rows (two sub-rows each):
-      Row 1 (Account): Due Date | Total Payment | Due Type | Due Type Amt | Property=Account | Prop Amount (principal) | Outstanding Amount
-      Row 2 (Interest): 0.00 | | | 0.00 | Principal Interest | interest_amount | 0.00
-  - First row is a disbursement (negative Total Payment)
+WHY TEXT-ONLY (not extract_tables):
+  pdfplumber's table extractor sees each repayment row as its own mini-table
+  and completely drops the "Principal Interest" sub-row that carries the
+  interest amount. The raw text stream contains everything correctly.
+
+TEXT STRUCTURE PER PAGE:
+  29/08/25  -99,180.00  Disburse Percen  99,180.00  Account  99,180.00  -99,180.00
+  tage                                   <- word-wrap artifact, ignored
+  28/10/25  1,994.40  Constant Repay  1,994.40  Account  776.69  -98,403.31
+  ment                                   <- word-wrap artifact, ignored
+  0.00  0.00  Principal Interest  1,217.71  0.00   <- 4th number = interest amount
+
+IMPORTANT EDGE CASE:
+  The last repayment on each page has its "Principal Interest" line as the
+  FIRST line of the next page. We handle this by collecting all lines into a
+  single stream and stripping page header/footer lines first.
 """
 
 import re
@@ -15,29 +24,39 @@ import frappe
 from datetime import datetime
 
 
+_SKIP_RE = re.compile(
+    r"^(Page\s+\d+\s+of\s+\d+"
+    r"|\d{1,2}\s+\w+\s+\d{4}"
+    r"|\d{2}:\d{2}:\d{2}"
+    r"|Arrangement\s+Schedule"
+    r"|Arrangement\s+Id"
+    r"|Customer\s+Id"
+    r"|Currency\s*:"
+    r"|Due\s+Date"
+    r"|^Amount$"
+    r")",
+    re.IGNORECASE,
+)
+
+_DATE_RE     = re.compile(r"^(\d{2}/\d{2}/\d{2})\s+")
+_NUM_RE      = re.compile(r"-?[\d,]+\.\d{2}")
+_INTEREST_RE = re.compile(r"Principal\s+Interest\s+([\d,]+\.\d{2})")
+
+
+def _clean(s: str) -> float:
+    return float(s.replace(",", ""))
+
+
+def _parse_date(s: str):
+    try:
+        return datetime.strptime(s.strip(), "%d/%m/%y").strftime("%Y-%m-%d")
+    except Exception:
+        return None
+
+
 def parse_schedule_pdf(file_path: str) -> dict:
     """
     Parse a loan schedule PDF and return structured data.
-
-    Returns:
-        {
-            "arrangement_id": str,
-            "product_name": str,
-            "customer_id": str,
-            "customer_name": str,
-            "currency": str,
-            "disbursement_date": str (YYYY-MM-DD),
-            "disbursement_amount": float,
-            "schedule_lines": [
-                {
-                    "due_date": str (YYYY-MM-DD),
-                    "total_payment": float,
-                    "principal_amount": float,
-                    "interest_amount": float,
-                    "outstanding_amount": float,
-                }
-            ]
-        }
     """
     try:
         import pdfplumber
@@ -55,231 +74,115 @@ def parse_schedule_pdf(file_path: str) -> dict:
         "schedule_lines": [],
     }
 
-    full_text = ""
-    all_rows = []
+    full_text   = ""
+    clean_lines = []
 
     with pdfplumber.open(file_path) as pdf:
         for page in pdf.pages:
             text = page.extract_text() or ""
             full_text += "\n" + text
+            for line in text.split("\n"):
+                if not _SKIP_RE.match(line.strip()):
+                    clean_lines.append(line)
 
-            # Extract table rows from page
-            tables = page.extract_tables()
-            for table in tables:
-                for row in table:
-                    if row:
-                        all_rows.append([cell.strip() if cell else "" for cell in row])
-
-    # ── Parse header from text ──────────────────────────────────────────
     _parse_header(full_text, result)
-
-    # ── Parse schedule lines from rows ─────────────────────────────────
-    if all_rows:
-        _parse_rows_from_table(all_rows, result)
-    else:
-        # Fallback: parse from raw text
-        _parse_rows_from_text(full_text, result)
+    _parse_lines(clean_lines, result)
 
     return result
 
 
 def _parse_header(text: str, result: dict):
-    """Extract arrangement metadata from the text block."""
-
-    # Arrangement Id
     m = re.search(r"Arrangement\s+Id\s*:\s*(\S+)", text)
     if m:
         result["arrangement_id"] = m.group(1).strip()
 
-    # Product Name
-    m = re.search(r"Product\s+Name\s*:\s*(.+?)(?:\n|Customer)", text, re.IGNORECASE)
+    m = re.search(r"Product\s+Name\s*:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
     if m:
         result["product_name"] = m.group(1).strip()
 
-    # Customer Id
     m = re.search(r"Customer\s+Id\s*:\s*(\d+)", text)
     if m:
         result["customer_id"] = m.group(1).strip()
 
-    # Customer Name (appears after Customer Id on same or next line)
-    m = re.search(r"Customer\s+Id\s*:\s*\d+\s+(.+?)(?:\n|Currency)", text, re.DOTALL)
+    m = re.search(r"Customer\s+Id\s*:\s*\d+\s+(.+?)(?:\n|$)", text)
     if m:
         result["customer_name"] = m.group(1).strip()
 
-    # Currency
     m = re.search(r"Currency\s*:\s*(\w+)", text)
     if m:
         result["currency"] = m.group(1).strip()
 
 
-def _parse_rows_from_table(rows: list, result: dict):
+def _parse_lines(lines: list, result: dict):
     """
-    Parse schedule lines from pdfplumber table rows.
-    Two consecutive rows represent one schedule entry:
-      - Row A: date | total_payment | due_type | ... | Account | principal | outstanding
-      - Row B: 0.00 | ... | Principal Interest | interest | 0.00
+    Walk the cleaned line stream extracting every repayment entry.
+
+    Each entry spans up to 3 source lines:
+      LINE A:  DD/MM/YY  total  [Constant Repay]  total  Account  principal  -outstanding
+      LINE B:  ment / tage  (word-wrap artifact — skipped)
+      LINE C:  0.00  0.00  Principal Interest  <interest>  0.00
+
+    LINE C may be the first line of the next page (page-boundary split).
+    We look ahead up to 4 lines, stopping early only when another date line
+    appears (which means a new entry started without an interest row).
     """
-    date_pattern = re.compile(r"^\d{2}/\d{2}/\d{2}$")
-    num_pattern = re.compile(r"^-?[\d,]+\.?\d*$")
-
-    def clean_num(s):
-        if not s:
-            return 0.0
-        return float(s.replace(",", "").strip() or "0")
-
-    def parse_date(s):
-        try:
-            return datetime.strptime(s.strip(), "%d/%m/%y").strftime("%Y-%m-%d")
-        except Exception:
-            return None
-
-    i = 0
-    pending = None  # accumulates row A data
-
-    for row in rows:
-        # Skip header rows
-        if any(h in str(row) for h in ["Due Date", "Due Type", "Property", "Outstanding"]):
-            continue
-
-        # Check if this row starts with a date (row A)
-        date_val = None
-        for cell in row:
-            if cell and date_pattern.match(cell.strip()):
-                date_val = cell.strip()
-                break
-
-        if date_val:
-            # Save previous pending if any
-            if pending:
-                result["schedule_lines"].append(pending)
-                pending = None
-
-            parsed_date = parse_date(date_val)
-            if not parsed_date:
-                continue
-
-            # Find numeric values
-            nums = [clean_num(c) for c in row if c and num_pattern.match(c.strip())]
-
-            # Disbursement row: total_payment is negative
-            if nums and nums[0] < 0:
-                result["disbursement_date"] = parsed_date
-                result["disbursement_amount"] = abs(nums[0])
-                continue
-
-            # Repayment row A
-            total_payment = nums[0] if len(nums) > 0 else 0.0
-            principal = 0.0
-            outstanding = 0.0
-
-            # Find Account property amount and outstanding
-            # Structure: ... Account | prop_amount | outstanding
-            for idx, cell in enumerate(row):
-                if cell and cell.strip() == "Account":
-                    # prop_amount is next non-empty cell, outstanding after that
-                    numeric_after = [c for c in row[idx + 1:] if c and num_pattern.match(c.strip())]
-                    if len(numeric_after) >= 2:
-                        principal = clean_num(numeric_after[0])
-                        outstanding = clean_num(numeric_after[1])
-                    elif len(numeric_after) == 1:
-                        principal = clean_num(numeric_after[0])
-                    break
-
-            pending = {
-                "due_date": parsed_date,
-                "total_payment": total_payment,
-                "principal_amount": principal,
-                "interest_amount": 0.0,
-                "outstanding_amount": abs(outstanding),
-            }
-
-        elif pending is not None:
-            # Row B: contains interest amount under "Principal Interest"
-            for idx, cell in enumerate(row):
-                if cell and "Principal Interest" in cell:
-                    numeric_after = [c for c in row[idx + 1:] if c and re.match(r"^[\d,]+\.?\d*$", c.strip())]
-                    if numeric_after:
-                        pending["interest_amount"] = clean_num(numeric_after[0])
-                    break
-
-            # Row B finalises the entry
-            result["schedule_lines"].append(pending)
-            pending = None
-
-    if pending:
-        result["schedule_lines"].append(pending)
-
-
-def _parse_rows_from_text(text: str, result: dict):
-    """
-    Fallback text-based parser when table extraction yields no rows.
-
-    Each repayment block looks like two consecutive lines:
-      Line A:  28/02/26  2,073.05  Constant Repayment  2,073.05  Account  1,360.89  -93,031.97
-      Line B:  0.00  0.00  Principal Interest  712.16  0.00
-
-    Strategy: find every date-bearing line, extract the last two numbers as
-    (principal_or_prop_amount, outstanding), then look ahead for interest.
-    """
-    lines = text.split("\n")
-
-    date_re = re.compile(r"(\d{2}/\d{2}/\d{2})")
-    num_re  = re.compile(r"-?[\d,]+\.\d{2}")
-
-    def clean(s):
-        return float(s.replace(",", ""))
-
     i = 0
     while i < len(lines):
         line = lines[i].strip()
-        dm = date_re.search(line)
-        if dm:
-            date_str = dm.group(1)
-            try:
-                parsed_date = datetime.strptime(date_str, "%d/%m/%y").strftime("%Y-%m-%d")
-            except Exception:
-                i += 1
-                continue
 
-            nums = [clean(n) for n in num_re.findall(line)]
+        dm = _DATE_RE.match(line)
+        if not dm:
+            i += 1
+            continue
 
-            # Disbursement: first significant number is negative
-            if nums and nums[0] < 0:
-                result["disbursement_date"] = parsed_date
-                result["disbursement_amount"] = abs(nums[0])
-                i += 1
-                continue
+        date_str = dm.group(1)
+        parsed_date = _parse_date(date_str)
+        if not parsed_date:
+            i += 1
+            continue
 
-            # Need at least: total_payment, ..., principal, outstanding
-            if len(nums) < 3:
-                i += 1
-                continue
+        nums = [_clean(n) for n in _NUM_RE.findall(line)]
 
-            total_payment = nums[0]
-            # The last number is outstanding (negative in source, stored positive)
-            outstanding = abs(nums[-1])
-            # The second-to-last is the principal (prop_amount)
-            principal = nums[-2]
+        # Disbursement row — first significant number is negative
+        if nums and nums[0] < 0:
+            result["disbursement_date"]   = parsed_date
+            result["disbursement_amount"] = abs(nums[0])
+            i += 1
+            continue
 
-            # Look ahead for interest row
-            interest = 0.0
-            if i + 1 < len(lines):
-                next_line = lines[i + 1]
-                if "Principal Interest" in next_line:
-                    interest_nums = num_re.findall(next_line)
-                    # Interest amount is the non-zero value
-                    for n in interest_nums:
-                        v = clean(n)
-                        if v > 0:
-                            interest = v
-                            break
-                    i += 1  # consume interest line
+        # Need at least: total_payment, ..., principal, outstanding
+        if len(nums) < 2:
+            i += 1
+            continue
 
-            result["schedule_lines"].append({
-                "due_date": parsed_date,
-                "total_payment": total_payment,
-                "principal_amount": principal,
-                "interest_amount": interest,
-                "outstanding_amount": outstanding,
-            })
+        total_payment = nums[0]
+        principal     = nums[-2]    # Prop Amount column (principal portion)
+        outstanding   = abs(nums[-1])  # Outstanding Amount (negative in source)
+
+        # Find the "Principal Interest" line — look ahead up to 4 lines
+        interest = 0.0
+        j = i + 1
+        while j < len(lines) and j <= i + 4:
+            next_line = lines[j].strip()
+
+            # Hit next repayment date — stop looking
+            if _DATE_RE.match(next_line):
+                break
+
+            m = _INTEREST_RE.search(next_line)
+            if m:
+                interest = _clean(m.group(1))
+                i = j    # advance past the interest line
+                break
+
+            j += 1
+
+        result["schedule_lines"].append({
+            "due_date":           parsed_date,
+            "total_payment":      total_payment,
+            "principal_amount":   principal,
+            "interest_amount":    interest,
+            "outstanding_amount": outstanding,
+        })
+
         i += 1

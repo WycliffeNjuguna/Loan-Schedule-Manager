@@ -69,7 +69,9 @@ def upload_and_preview_schedule(file_doc_name: str) -> dict:
 # ──────────────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
-def create_loan_schedule(parsed_data: dict, accounts: dict, file_doc_name: str = None) -> str:
+# def create_loan_schedule(parsed_data: dict, accounts: dict, file_doc_name: str = None) -> str:
+def create_loan_schedule(parsed_data, accounts, file_doc_name=None):
+
     """
     Step 2: Create the Bank Loan Schedule document from parsed data + account config.
 
