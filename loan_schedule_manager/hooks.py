@@ -23,5 +23,12 @@ scheduler_events = {
 
 # Fixtures - export these DocTypes when running bench export-fixtures
 fixtures = [
-    {"dt": "Custom Field", "filters": [["module", "=", "Loan Schedule Manager"]]},
+    {
+        "dt": "Custom Field",
+        "filters": [["module", "=", "Loan Schedule Manager"]]
+    },
+    {
+        "dt": "Web Page",
+        "filters": [["module", "=", "Loan Schedule Manager"]]
+    }
 ]
